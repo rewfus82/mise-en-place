@@ -1,0 +1,25 @@
+# Secrets
+.env
+.env.*
+.streamlit/secrets.toml
+
+# Data / local DBs
+data/*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+
+# Editor / OS
+.DS_Store
+*.log
+.vscode/
+.idea/
