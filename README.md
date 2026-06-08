@@ -15,8 +15,9 @@ maintenance calories from logged weight plus actual intake over time.
 
 ## Live demo
 
-Deploy the included [`render.yaml`](#deployment) for a public URL (drop it here
-once deployed). The demo is **BYOK (bring-your-own-key)** and provider-agnostic:
+**▶ [mise-en-place-rwdy.onrender.com](https://mise-en-place-rwdy.onrender.com)** —
+deployed on Render's free tier (first load may take ~30s to wake).
+The demo is **BYOK (bring-your-own-key)** and provider-agnostic:
 click **Connect AI** in the sidebar and pick **Claude (Anthropic)** or
 **ChatGPT (OpenAI)**, then paste a key for that provider. The key is stored only
 in your browser and sent only to the demo's backend, which uses it in-memory for
