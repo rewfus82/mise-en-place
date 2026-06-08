@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { track } from '../../lib/analytics'
 import { usePantryMutations } from '../../hooks/usePantry'
 import { Button } from '../ui/Button'
 
@@ -9,6 +10,7 @@ export function PantryParser() {
 
   const handleParse = async () => {
     const res = await parse.mutateAsync(text)
+    track('pantry_parsed', { added: res.added.length, skipped: res.skipped.length })
     setResult(res)
     if (res.added.length > 0) setText('')
   }

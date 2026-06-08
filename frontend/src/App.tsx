@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { track, trackPageView } from './lib/analytics'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { AppShell } from './components/layout/AppShell'
 import { CalendarPage } from './pages/CalendarPage'
@@ -17,6 +18,14 @@ const queryClient = new QueryClient({
     queries: { retry: 1, staleTime: 30_000 },
   },
 })
+
+function RouteTracker() {
+  const location = useLocation()
+  useEffect(() => {
+    trackPageView(location.pathname)
+  }, [location.pathname])
+  return null
+}
 
 function ThemeSync() {
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: profileApi.get })
@@ -65,7 +74,10 @@ function AppRoutes() {
   if (needsOnboarding) {
     return (
       <OnboardingWizard
-        onComplete={() => queryClient.invalidateQueries({ queryKey: ['profile'] })}
+        onComplete={() => {
+          track('onboarding_completed')
+          queryClient.invalidateQueries({ queryKey: ['profile'] })
+        }}
       />
     )
   }
@@ -92,6 +104,7 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <RouteTracker />
           <ThemeSync />
           <AppRoutes />
         </BrowserRouter>

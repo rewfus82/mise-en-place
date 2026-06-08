@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { track } from '../lib/analytics'
 import {
   clearLlmCreds,
   getLlmCreds,
@@ -62,6 +63,7 @@ function LlmKeyModal({ onClose }: { onClose: () => void }) {
   function save() {
     if (!key.trim()) return
     setLlmCreds({ provider, key: key.trim() })
+    track('ai_provider_connected', { provider })
     onClose()
   }
 

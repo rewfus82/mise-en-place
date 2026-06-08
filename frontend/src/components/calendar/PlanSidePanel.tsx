@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { track } from '../../lib/analytics'
 import { streamSSE } from '../../api/client'
 import type { SSEEvent, SSEReviewEvent } from '../../types'
 import { Button } from '../ui/Button'
@@ -40,6 +41,8 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
     setProgressMessages([])
     setError(null)
 
+    track('plan_started', { num_days: numDays, bulk_prep: bulkEnabled })
+
     const tid = `range-${startDate}-${numDays}-${Date.now()}`
     setThreadId(tid)
 
@@ -61,6 +64,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
           setStep('config')
           return
         } else if (e.type === 'awaiting_review') {
+          track('plan_awaiting_review', { num_days: numDays })
           setReviewData(e as SSEReviewEvent)
           setStep('review')
           return
@@ -78,6 +82,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
 
   const handleApprove = async () => {
     if (!threadId) return
+    track('plan_approved', { num_days: numDays })
     setStep('committing')
 
     try {
@@ -100,6 +105,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
 
   const handleRevise = async () => {
     if (!threadId || !feedback.trim()) return
+    track('plan_revised')
     setStep('streaming')
     setProgressMessages([`Revising — ${feedback}`])
     setError(null)
@@ -238,7 +244,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
             {/* Status header */}
             <div className="flex items-center gap-2.5 text-emerald-400">
               <span className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
-              <span className="text-sm font-medium">Claude is working…</span>
+              <span className="text-sm font-medium">Generating your plan…</span>
             </div>
 
             {/* Activity log window */}

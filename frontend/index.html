@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Analytics (GA4) — SPA page_view is sent manually from React -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1BPXVBPGQ0"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1BPXVBPGQ0', { send_page_view: false });
+    </script>
+
     <title>mise-en-place — multi-agent AI meal planner</title>
     <meta
       name="description"
