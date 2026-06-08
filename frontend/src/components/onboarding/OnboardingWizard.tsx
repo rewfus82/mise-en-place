@@ -80,11 +80,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   const computeProtein = () => {
+    // 1 g/lb baseline, goal-adjusted per evidence (matches backend recommended_macros):
+    // surplus spares protein (bulk = maintenance), deficit gets more to keep lean mass.
     const wLbs = Number(weightLbs)
-    if (goal === 'bulk') return Math.round(wLbs * 0.85)
     if (goal === 'cut') return Math.round(wLbs * 1.2)
-    if (goal === 'recomp') return Math.round(wLbs * 1.0)
-    return Math.round(wLbs * 0.8)
+    if (goal === 'recomp') return Math.round(wLbs * 1.1)
+    return Math.round(wLbs * 1.0) // maintain & bulk
   }
 
   const isMetricsValid = weightLbs && heightFt && age && Number(weightLbs) > 0

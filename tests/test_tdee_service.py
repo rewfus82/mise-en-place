@@ -49,16 +49,16 @@ class TestCalculateTdee:
 class TestRecommendedMacros:
     def test_maintain(self):
         m = recommended_macros(2500, "maintain", 80)
-        # weight_lbs = 176.3696; protein = round(*0.8) = 141
+        # weight_lbs = 176.3696; protein = round(*1.0) = 176
         assert m["calories"] == 2500
-        assert m["protein_g"] == 141
+        assert m["protein_g"] == 176
         assert m["fat_g"] == 69          # round(2500*0.25/9)
-        assert m["carbs_g"] == 329       # round((1936 - 621)/4)
+        assert m["carbs_g"] == 294       # round((1796 - 621)/4)
 
     def test_bulk_adds_surplus(self):
         m = recommended_macros(2500, "bulk", 80)
         assert m["calories"] == 2875     # round(2500*1.15)
-        assert m["protein_g"] == 150     # round(176.3696*0.85)
+        assert m["protein_g"] == 176     # round(176.3696*1.0) — surplus spares protein
 
     def test_cut_creates_deficit(self):
         m = recommended_macros(2500, "cut", 80)

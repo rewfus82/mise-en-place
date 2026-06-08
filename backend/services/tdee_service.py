@@ -44,30 +44,23 @@ def recommended_macros(
 ) -> dict:
     weight_lbs = weight_kg * 2.20462
 
+    # Protein: 1 g/lb baseline, adjusted by goal per current evidence. A surplus
+    # spares protein (bulk needs no more than maintenance); a deficit benefits from
+    # extra to preserve lean mass (cut highest). Computed off lean mass when body
+    # fat is known (more accurate for trained athletes), else total bodyweight.
+    PROTEIN_PER_LB = {"maintain": 1.0, "bulk": 1.0, "recomp": 1.1, "cut": 1.2}
+
     if goal == "bulk":
         calories = round(tdee * 1.15)
-        if body_fat_pct is not None:
-            lean_lbs = weight_lbs * (1 - body_fat_pct / 100)
-            protein_g = round(lean_lbs * 1.0)
-        else:
-            protein_g = round(weight_lbs * 0.85)
     elif goal == "cut":
         calories = round(tdee * 0.80)
-        if body_fat_pct is not None:
-            lean_lbs = weight_lbs * (1 - body_fat_pct / 100)
-            protein_g = round(lean_lbs * 1.2)
-        else:
-            protein_g = round(weight_lbs * 1.2)
-    elif goal == "recomp":
+    else:  # recomp, maintain, or unknown -> maintenance calories
         calories = tdee
-        if body_fat_pct is not None:
-            lean_lbs = weight_lbs * (1 - body_fat_pct / 100)
-            protein_g = round(lean_lbs * 1.1)
-        else:
-            protein_g = round(weight_lbs * 1.0)
-    else:  # maintain
-        calories = tdee
-        protein_g = round(weight_lbs * 0.8)
+
+    basis_lbs = (
+        weight_lbs * (1 - body_fat_pct / 100) if body_fat_pct is not None else weight_lbs
+    )
+    protein_g = round(basis_lbs * PROTEIN_PER_LB.get(goal, PROTEIN_PER_LB["maintain"]))
 
     fat_g = round(calories * 0.25 / 9)
     remaining = calories - protein_g * 4
