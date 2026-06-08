@@ -43,7 +43,7 @@ export function DayPanel({ date, day, profile, onClose }: DayPanelProps) {
 
   const [weightInput, setWeightInput] = useState('')
   const [weightStatus, setWeightStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const weightTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const weightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     if (currentEntry) {

@@ -1,7 +1,8 @@
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 
+from meal_planner.llm import get_request_creds, make_llm
 from meal_planner.tools.pantry_tools import tool_add_items, tool_get_inventory
 
 _CATEGORIES = "produce, protein, dairy, grains, canned, frozen, condiments, spices, other"
@@ -25,14 +26,16 @@ class _ParsedPantry(BaseModel):
     items: list[_Item]
 
 
-_llm = ChatAnthropic(model="claude-haiku-4-5-20251001")
-_parser = _llm.with_structured_output(_ParsedPantry)
+def make_parser(provider: str, api_key: str):
+    """Build a structured pantry parser bound to the caller's provider + key (BYOK)."""
+    return make_llm(provider, api_key, role="light").with_structured_output(_ParsedPantry)
 
 
-def pantry_parser_node(state: dict) -> dict:
+def pantry_parser_node(state: dict, config: RunnableConfig | None = None) -> dict:
     user_input = state["messages"][-1].content
 
-    parsed: _ParsedPantry = _parser.invoke(
+    parser = make_parser(*get_request_creds())
+    parsed: _ParsedPantry = parser.invoke(
         [SystemMessage(content=_SYSTEM), HumanMessage(content=user_input)]
     )
 

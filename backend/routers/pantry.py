@@ -1,7 +1,7 @@
 from __future__ import annotations
 import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from backend.database import get_db
@@ -49,11 +49,21 @@ def clear_pantry():
 
 
 @router.post("/parse", response_model=ParsePantryResponse)
-def parse_pantry(body: ParsePantryRequest):
-    from meal_planner.agents.pantry_parser import _parser, _SYSTEM
+def parse_pantry(
+    body: ParsePantryRequest,
+    x_llm_provider: str = Header(default=""),
+    x_llm_key: str = Header(default=""),
+):
+    from meal_planner.agents.pantry_parser import make_parser, _SYSTEM
+    from meal_planner.llm import LLMConfigError
     from meal_planner.tools.pantry_tools import tool_add_items
 
-    parsed = _parser.invoke([
+    try:
+        parser = make_parser(x_llm_provider, x_llm_key)
+    except LLMConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    parsed = parser.invoke([
         SystemMessage(content=_SYSTEM),
         HumanMessage(content=body.text),
     ])

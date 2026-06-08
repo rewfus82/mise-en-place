@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { LlmKeyButton } from '../LlmKeyButton'
 
 const links = [
   {
@@ -74,8 +75,9 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-slate-800/60">
-        <div className="text-[10px] text-slate-600 font-medium">Powered by Claude + LangGraph</div>
+      <div className="px-3 py-4 border-t border-slate-800/60 space-y-2">
+        <LlmKeyButton />
+        <div className="px-2 text-[10px] text-slate-600 font-medium">Powered by Claude / OpenAI + LangGraph</div>
       </div>
     </aside>
   )

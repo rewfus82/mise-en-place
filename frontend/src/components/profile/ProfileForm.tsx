@@ -50,7 +50,7 @@ export function ProfileForm() {
   const [status, setStatus]           = useState<SaveStatus>('idle')
 
   const pendingRef = useRef<Partial<UserProfile>>({})
-  const timerRef   = useRef<ReturnType<typeof setTimeout>>()
+  const timerRef   = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const update = useMutation({
     mutationFn: (data: Partial<UserProfile>) => profileApi.update(data),

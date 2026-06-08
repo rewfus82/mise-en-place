@@ -1,7 +1,8 @@
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 
+from meal_planner.llm import get_request_creds, make_llm
 from meal_planner.state import MealPlannerState
 
 _SYSTEM = """You are a frugal, organized grocery shopper.
@@ -28,11 +29,9 @@ class _ShoppingList(BaseModel):
     items_from_pantry: list[str]
 
 
-_llm = ChatAnthropic(model="claude-haiku-4-5-20251001")
-_extractor = _llm.with_structured_output(_ShoppingList)
+def shopping_list_node(state: MealPlannerState, config: RunnableConfig | None = None) -> dict:
+    extractor = make_llm(*get_request_creds(), role="light").with_structured_output(_ShoppingList)
 
-
-def shopping_list_node(state: MealPlannerState) -> dict:
     pantry_str = (
         "\n".join(
             f"- {p['item']}: {p.get('quantity', 'unknown')}"
@@ -61,7 +60,7 @@ Leftovers OK: {leftovers_ok}
 
 Generate the complete shopping list for this week."""
 
-    result: _ShoppingList = _extractor.invoke(
+    result: _ShoppingList = extractor.invoke(
         [SystemMessage(content=_SYSTEM), HumanMessage(content=prompt)]
     )
 

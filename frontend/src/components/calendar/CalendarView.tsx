@@ -66,9 +66,6 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
   }
 
   const hasPlan = (date: string) => (dayMap.get(date)?.meals.length ?? 0) > 0
-  // Only empty future in-month days are selectable for a new plan.
-  const isSelectable = (date: string) =>
-    date >= today && !hasPlan(date) && allCells.find(c => c.date === date)?.isCurrentMonth
   // Past dates (or today) are "viewable" — can open history panel
   const isViewable = (date: string) => date <= today
 

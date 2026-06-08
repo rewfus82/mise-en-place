@@ -6,9 +6,28 @@ import sqlite3
 from threading import Thread
 
 from backend.schemas.planning import PlanRangeRequest, ResumePlanRequest
+from meal_planner.llm import (
+    LLMConfigError,
+    normalize_provider,
+    reset_request_creds,
+    set_request_creds,
+)
 from meal_planner.mcp_servers.pantry_server import get_inventory
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_creds(provider: str, api_key: str) -> tuple[str, str]:
+    """Normalize the provider and require a key. Raises LLMConfigError if bad.
+
+    The key is NOT placed in the graph config — LangGraph's checkpointer persists
+    config.configurable to disk. It is carried in a request-scoped ContextVar
+    (see set_request_creds) instead, and never logged.
+    """
+    norm = normalize_provider(provider)
+    if not api_key or not api_key.strip():
+        raise LLMConfigError("No API key provided for the selected AI provider.")
+    return norm, api_key
 
 
 _graph = None
@@ -163,7 +182,14 @@ def _persist_plan(planned_days: list[dict], db: sqlite3.Connection) -> None:
     db.commit()
 
 
-def regenerate_day(date: str, profile: dict, db: sqlite3.Connection, special_requests: str = "") -> int:
+def regenerate_day(
+    date: str,
+    profile: dict,
+    db: sqlite3.Connection,
+    special_requests: str = "",
+    provider: str = "",
+    api_key: str = "",
+) -> int:
     """Re-run generation for a single day and replace its meals. Returns meal count.
 
     Synchronous (single blocking LLM call ~10–15s). Only the one day's meals are
@@ -173,7 +199,13 @@ def regenerate_day(date: str, profile: dict, db: sqlite3.Connection, special_req
 
     req = PlanRangeRequest(start_date=date, num_days=1, special_requests=special_requests)
     state = _build_initial_state(req, profile, get_inventory())
-    out = meal_planner_node(state)
+
+    norm_provider, api_key = _validate_creds(provider, api_key)
+    token = set_request_creds(norm_provider, api_key)
+    try:
+        out = meal_planner_node(state)
+    finally:
+        reset_request_creds(token)
     planned_days = out.get("planned_days") or []
     if not planned_days or not planned_days[0].get("meals"):
         raise ValueError("Generation produced no meals")
@@ -189,9 +221,23 @@ def regenerate_day(date: str, profile: dict, db: sqlite3.Connection, special_req
     return len(planned_days[0]["meals"])
 
 
-async def stream_plan(req: PlanRangeRequest, profile: dict, db: sqlite3.Connection):
+async def stream_plan(
+    req: PlanRangeRequest,
+    profile: dict,
+    db: sqlite3.Connection,
+    provider: str = "",
+    api_key: str = "",
+):
     thread_id = req.thread_id or f"range-{req.start_date}-{req.num_days}"
     range_key = thread_id
+
+    try:
+        norm_provider, api_key = _validate_creds(provider, api_key)
+    except LLMConfigError as exc:
+        yield _sse({"type": "error", "message": str(exc)})
+        return
+
+    config = {"configurable": {"thread_id": thread_id}}
 
     if range_key not in _range_locks:
         _range_locks[range_key] = asyncio.Lock()
@@ -199,31 +245,36 @@ async def stream_plan(req: PlanRangeRequest, profile: dict, db: sqlite3.Connecti
     async with _range_locks[range_key]:
         graph = get_graph()
         initial_state = _build_initial_state(req, profile, get_inventory())
-        config = {"configurable": {"thread_id": thread_id}}
 
         queue: asyncio.Queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
 
         def _run_sync():
+            # ContextVar must be set in THIS thread (the one running the graph), as
+            # new threads start with a fresh context.
+            token = set_request_creds(norm_provider, api_key)
             try:
-                for chunk in graph.stream(initial_state, config, stream_mode="updates"):
-                    for node_name, state_update in chunk.items():
-                        if node_name == "__interrupt__":
-                            continue
-                        msg = ""
-                        if "messages" in state_update:
-                            msgs = state_update["messages"]
-                            if msgs:
-                                msg = msgs[-1].content if hasattr(msgs[-1], "content") else str(msgs[-1])
-                        loop.call_soon_threadsafe(
-                            queue.put_nowait,
-                            {"type": "progress", "agent": node_name, "message": msg},
-                        )
-            except Exception as exc:
-                logger.exception("Planning stream failed for thread %s", thread_id)
-                loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": str(exc)})
-                return
-            loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": None})
+                try:
+                    for chunk in graph.stream(initial_state, config, stream_mode="updates"):
+                        for node_name, state_update in chunk.items():
+                            if node_name == "__interrupt__":
+                                continue
+                            msg = ""
+                            if "messages" in state_update:
+                                msgs = state_update["messages"]
+                                if msgs:
+                                    msg = msgs[-1].content if hasattr(msgs[-1], "content") else str(msgs[-1])
+                            loop.call_soon_threadsafe(
+                                queue.put_nowait,
+                                {"type": "progress", "agent": node_name, "message": msg},
+                            )
+                except Exception as exc:
+                    logger.exception("Planning stream failed for thread %s", thread_id)
+                    loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": str(exc)})
+                    return
+                loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": None})
+            finally:
+                reset_request_creds(token)
 
         thread = Thread(target=_run_sync, daemon=True)
         thread.start()
@@ -274,11 +325,22 @@ async def stream_plan(req: PlanRangeRequest, profile: dict, db: sqlite3.Connecti
             yield _sse({"type": "complete", "thread_id": thread_id})
 
 
-async def resume_plan(req: ResumePlanRequest, db: sqlite3.Connection):
+async def resume_plan(
+    req: ResumePlanRequest,
+    db: sqlite3.Connection,
+    provider: str = "",
+    api_key: str = "",
+):
     from langgraph.types import Command
 
-    graph = get_graph()
+    try:
+        norm_provider, api_key = _validate_creds(provider, api_key)
+    except LLMConfigError as exc:
+        yield _sse({"type": "error", "message": str(exc)})
+        return
+
     config = {"configurable": {"thread_id": req.thread_id}}
+    graph = get_graph()
 
     approved = req.feedback.lower().strip() in {"approve", "approved", "yes", "y", "ok", "lgtm", "looks good"}
 
@@ -286,27 +348,31 @@ async def resume_plan(req: ResumePlanRequest, db: sqlite3.Connection):
     loop = asyncio.get_event_loop()
 
     def _run_sync():
+        token = set_request_creds(norm_provider, api_key)
         try:
-            for chunk in graph.stream(
-                Command(resume=req.feedback), config, stream_mode="updates"
-            ):
-                for node_name, state_update in chunk.items():
-                    if node_name == "__interrupt__":
-                        continue
-                    msg = ""
-                    if "messages" in state_update:
-                        msgs = state_update["messages"]
-                        if msgs:
-                            msg = msgs[-1].content if hasattr(msgs[-1], "content") else str(msgs[-1])
-                    loop.call_soon_threadsafe(
-                        queue.put_nowait,
-                        {"type": "progress", "agent": node_name, "message": msg},
-                    )
-        except Exception as exc:
-            logger.exception("Resume stream failed for thread %s", req.thread_id)
-            loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": str(exc)})
-            return
-        loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": None})
+            try:
+                for chunk in graph.stream(
+                    Command(resume=req.feedback), config, stream_mode="updates"
+                ):
+                    for node_name, state_update in chunk.items():
+                        if node_name == "__interrupt__":
+                            continue
+                        msg = ""
+                        if "messages" in state_update:
+                            msgs = state_update["messages"]
+                            if msgs:
+                                msg = msgs[-1].content if hasattr(msgs[-1], "content") else str(msgs[-1])
+                        loop.call_soon_threadsafe(
+                            queue.put_nowait,
+                            {"type": "progress", "agent": node_name, "message": msg},
+                        )
+            except Exception as exc:
+                logger.exception("Resume stream failed for thread %s", req.thread_id)
+                loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": str(exc)})
+                return
+            loop.call_soon_threadsafe(queue.put_nowait, {"type": "_stream_done", "exc": None})
+        finally:
+            reset_request_creds(token)
 
     thread = Thread(target=_run_sync, daemon=True)
     thread.start()

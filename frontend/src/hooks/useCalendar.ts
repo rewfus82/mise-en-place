@@ -37,7 +37,7 @@ export function useCalendarMutations() {
   const toggleEaten = useMutation({
     mutationFn: ({ date, mealId, eaten }: { date: string; mealId: number; eaten: boolean }) =>
       calendarApi.toggleEaten(date, mealId, eaten),
-    onSuccess: (_, vars) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['calendar'] })
     },
   })

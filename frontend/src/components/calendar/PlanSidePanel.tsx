@@ -57,7 +57,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
         if (e.type === 'progress' && e.message) {
           setProgressMessages(prev => [...prev, `${e.message}`])
         } else if (e.type === 'error') {
-          setError((e as Record<string, string>).message ?? 'An error occurred')
+          setError(e.message ?? 'An error occurred')
           setStep('config')
           return
         } else if (e.type === 'awaiting_review') {

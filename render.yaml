@@ -1,0 +1,23 @@
+# Render blueprint — one Docker web service serving the FastAPI backend AND the
+# built React frontend on the same origin. https://render.com/docs/blueprint-spec
+#
+# Deploy: push to GitHub, then in Render → "New +" → "Blueprint" → pick this repo.
+# No secrets required: this is a BYOK demo — each visitor supplies their own
+# Claude/OpenAI key at runtime, so nothing sensitive lives on the server.
+services:
+  - type: web
+    name: mise-en-place
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: LOG_LEVEL
+        value: INFO
+      # LangSmith tracing is off by default. To enable, set these in the Render
+      # dashboard (do NOT commit real keys):
+      #   LANGCHAIN_TRACING_V2=true
+      #   LANGSMITH_API_KEY=...
+      #   LANGSMITH_PROJECT=mise-en-place
+      # Model IDs are overridable here too, e.g. OPENAI_PLANNER_MODEL, ANTHROPIC_PLANNER_MODEL.

@@ -2,10 +2,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date as _Date, timedelta
 from typing import Annotated, Literal
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
+from meal_planner.llm import get_request_creds, make_llm
 from meal_planner.state import RangePlanState
 
 _SYSTEM = """You are a professional meal planner for athletes and bodybuilders.
@@ -98,15 +99,19 @@ class _RangePlan(BaseModel):
     days: list[_DayPlan]
 
 
-_llm = ChatAnthropic(model="claude-sonnet-4-6")
-_planner = _llm.with_structured_output(_RangePlan)      # all days in one call (bulk prep)
-_planner_day = _llm.with_structured_output(_DayPlan)    # a single day (parallel path)
-
 # Cap concurrent LLM calls so a long plan doesn't blow past API rate limits.
 _MAX_PARALLEL_DAYS = 5
 
 
-def meal_planner_node(state: RangePlanState) -> dict:
+def meal_planner_node(state: RangePlanState, config: RunnableConfig | None = None) -> dict:
+    # BYOK creds come from the request-scoped ContextVar, never from the graph
+    # config (which the checkpointer would persist to disk). `config` is accepted
+    # for LangGraph node-signature compatibility but intentionally unused here.
+    provider, api_key = get_request_creds()
+    llm = make_llm(provider, api_key, role="planner")
+    planner = llm.with_structured_output(_RangePlan)      # all days in one call (bulk prep)
+    planner_day = llm.with_structured_output(_DayPlan)    # a single day (parallel path)
+
     pantry_items = (
         ", ".join(p["item"] for p in state.get("pantry_inventory", []))
         or "none"
@@ -157,7 +162,7 @@ def meal_planner_node(state: RangePlanState) -> dict:
         bulk_instructions = _BULK_TEMPLATE_ON.format(bulk_pct=pct, repeat_instruction=repeat_instr)
         system = _system(num_days, state["start_date"], bulk_instructions)
         human = HumanMessage(content=f"Create my meal plan.{feedback_addendum}")
-        plan: _RangePlan = _planner.invoke([system, human])
+        plan: _RangePlan = planner.invoke([system, human])
         planned_days = [d.model_dump() for d in plan.days]
     else:
         # Days are independent (each hits the same per-day macro target), so we
@@ -176,7 +181,7 @@ def meal_planner_node(state: RangePlanState) -> dict:
                     f"{feedback_addendum}"
                 )
             )
-            day: _DayPlan = _planner_day.invoke([system, human])
+            day: _DayPlan = planner_day.invoke([system, human])
             day_dict = day.model_dump()
             day_dict["date"] = target_date  # trust our date, not the model's
             return day_dict

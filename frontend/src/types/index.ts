@@ -142,7 +142,16 @@ export interface SSECompleteEvent {
   thread_id: string
 }
 
-export type SSEEvent = SSEProgressEvent | SSEReviewEvent | SSECompleteEvent
+export interface SSEErrorEvent {
+  type: 'error'
+  message: string
+}
+
+export type SSEEvent =
+  | SSEProgressEvent
+  | SSEReviewEvent
+  | SSECompleteEvent
+  | SSEErrorEvent
 
 export interface WeightEntry {
   id: number

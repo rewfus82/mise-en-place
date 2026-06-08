@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { profileApi } from '../../api/profile'
 import type { UserProfile } from '../../types'
@@ -20,7 +20,7 @@ export function MacroTargets() {
   const [status, setStatus]     = useState<SaveStatus>('idle')
 
   const initialized = useRef(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Initialize from saved profile (only once per profile load)
   useEffect(() => {

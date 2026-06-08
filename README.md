@@ -13,19 +13,31 @@ maintenance calories from logged weight plus actual intake over time.
 
 ---
 
+## Live demo
+
+Deploy the included [`render.yaml`](#deployment) for a public URL (drop it here
+once deployed). The demo is **BYOK (bring-your-own-key)** and provider-agnostic:
+click **Connect AI** in the sidebar and pick **Claude (Anthropic)** or
+**ChatGPT (OpenAI)**, then paste a key for that provider. The key is stored only
+in your browser and sent only to the demo's backend, which uses it in-memory for
+your requests and **never stores or logs it**. (Demo data is shared and resets
+periodically.)
+
+---
+
 ## Architecture
 
 ```
  React + Vite + TS            FastAPI (HTTP + SSE)             LangGraph agents
 ┌──────────────────┐  /api   ┌─────────────────────┐  stream ┌────────────────────────────┐
 │ Calendar / Plan  │ ──────▶ │ routers/             │ ──────▶ │ orchestrator (router)        │
-│ review / Pantry  │ ◀────── │  profile pantry plan │ ◀────── │   → meal_planner (Claude)    │
+│ review / Pantry  │ ◀────── │  profile pantry plan │ ◀────── │   → meal_planner (Claude/GPT)    │
 │ Grocery / Profile│  JSON   │  calendar grocery    │  events │   → nutrition (pure Python)  │
 └──────────────────┘         │  weight diagnostics  │         │   → human_review (interrupt) │
                              └─────────┬───────────┘         └──────────────┬─────────────┘
                                        │                                     │
                           SQLite: calendar.db                  SqliteSaver checkpoints.db
-                          pantry.db (via MCP server)           Claude structured output
+                          pantry.db (via MCP server)           typed structured output
 ```
 
 **The planning graph** is a state machine with an orchestrator that routes based
@@ -70,21 +82,22 @@ SQLite checkpointer.
 |---|---|
 | Frontend | React 19, Vite, TypeScript, Tailwind, TanStack Query, React Router |
 | Backend | FastAPI, Uvicorn, Pydantic v2, SSE |
-| AI | LangGraph, LangChain, Claude (Anthropic), LangSmith tracing |
+| AI | LangGraph, LangChain, Claude (Anthropic) **or** OpenAI (BYOK), LangSmith tracing |
 | Tools | FastMCP (custom pantry MCP server) |
 | Storage | SQLite (calendar, pantry, LangGraph checkpoints) |
 | Tests | pytest, Vitest |
 
 ## Getting started
 
-**Prerequisites:** Python 3.11+, Node 18+, an Anthropic API key.
+**Prerequisites:** Python 3.11+, Node 18+, and a Claude (Anthropic) **or** OpenAI
+API key — entered in the app, not in a file (BYOK).
 
 ```bash
 # 1. Backend deps
 pip install -e ".[dev]"
 
-# 2. Environment — copy the example and fill in your key
-cp .env.example .env       # then edit ANTHROPIC_API_KEY
+# 2. (Optional) Environment — only needed for LangSmith tracing
+cp .env.example .env       # LLM keys are NOT read from here (BYOK)
 
 # 3. Run the API (http://localhost:8000)
 uvicorn backend.main:app --reload
@@ -95,6 +108,7 @@ npm install
 npm run dev
 ```
 
+Then click **Connect AI** in the sidebar and paste your Claude or OpenAI key.
 Vite proxies `/api` → `http://localhost:8000`, so the frontend talks to the
 backend with no CORS fuss in dev.
 
@@ -117,8 +131,28 @@ tests/        pytest suite
 
 ## Diagnostics
 
-`GET /health` is a fast liveness probe; `GET /health/detailed` reports DB tables,
-checkpoint DB, graph compilation, API-key presence, and the LangGraph version.
+`GET /api/health` is a fast liveness probe; `GET /api/health/detailed` reports DB
+tables, checkpoint DB, graph compilation, and the LangGraph version.
+
+## Deployment
+
+One Docker image builds the React frontend and serves it from FastAPI on the
+**same origin** as the API (the frontend calls a relative `/api`, so there's no
+CORS and no second deploy). The included `render.yaml` deploys it to Render's free
+tier. Because the demo is **BYOK**, there are **no server-side LLM secrets** to
+configure — visitors supply their own keys at runtime.
+
+```bash
+docker build -t mise-en-place .
+docker run -p 8000:8000 mise-en-place   # http://localhost:8000
+```
+
+> Free-tier hosts use an ephemeral filesystem, so the SQLite databases reset on
+> restart and are shared across visitors — intentional for a demo sandbox. For
+> durable, per-user data use a persistent volume or Postgres.
+
+Model IDs default to current Claude/OpenAI models and are overridable via env
+(`ANTHROPIC_PLANNER_MODEL`, `OPENAI_PLANNER_MODEL`, `*_LIGHT_MODEL`).
 
 ---
 

@@ -21,7 +21,7 @@ function barColor(val: number, target: number): string {
   return 'bg-emerald-500'
 }
 
-export function MacroBar({ calories, protein, carbs, fat, targetCalories, targetProtein, compact }: MacroBarProps) {
+export function MacroBar({ calories, protein, carbs, fat, targetCalories, compact }: MacroBarProps) {
   if (compact) {
     return (
       <span className="text-xs text-slate-400">

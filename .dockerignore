@@ -1,0 +1,25 @@
+# Build artifacts / deps — rebuilt inside the image
+frontend/node_modules
+frontend/dist
+**/__pycache__
+*.pyc
+.venv
+*.egg-info
+.pytest_cache
+
+# Local data & secrets — must never ship in the image
+data/
+.env
+.env.*
+.streamlit
+
+# VCS / editor / OS
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+*.log
+
+# Docs/CI not needed at runtime
+HANDOFF.md

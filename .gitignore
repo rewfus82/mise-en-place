@@ -1,6 +1,7 @@
 # Secrets
 .env
 .env.*
+!.env.example
 .streamlit/secrets.toml
 
 # Data / local DBs
