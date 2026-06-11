@@ -24,6 +24,12 @@ export const pantryApi = {
       body: JSON.stringify({ text }),
     }),
 
+  parseImage: (data: string, mime_type: string) =>
+    apiFetch<{ added: string[]; skipped: string[] }>('/pantry/parse-image', {
+      method: 'POST',
+      body: JSON.stringify({ data, mime_type }),
+    }),
+
   deplete: (items: string[]) =>
     apiFetch<{ removed: string[] }>('/pantry/deplete', {
       method: 'POST',

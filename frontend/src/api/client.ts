@@ -19,11 +19,16 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   return res.json() as Promise<T>
 }
 
-export async function* streamSSE(path: string, body: unknown): AsyncGenerator<Record<string, unknown>> {
+export async function* streamSSE(
+  path: string,
+  body: unknown,
+  signal?: AbortSignal,
+): AsyncGenerator<Record<string, unknown>> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...llmHeaders() },
     body: JSON.stringify(body),
+    signal,
   })
   if (!res.ok || !res.body) throw new Error(`SSE request failed: ${res.status}`)
 

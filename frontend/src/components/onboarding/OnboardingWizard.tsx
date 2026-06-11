@@ -66,7 +66,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const wKg = kgFromLbs(Number(weightLbs))
     const hCm = cmFromFtIn(Number(heightFt), Number(heightIn))
     const a = Number(age)
-    let bmr = 10 * wKg + 6.25 * hCm - 5 * a + (sex === 'male' ? 5 : -161)
+    const bmr = 10 * wKg + 6.25 * hCm - 5 * a + (sex === 'male' ? 5 : -161)
     const multipliers: Record<ActivityLevel, number> = {
       sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725, extra_active: 1.9,
     }

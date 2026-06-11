@@ -4,8 +4,11 @@
 !.env.example
 .streamlit/secrets.toml
 
-# Data / local DBs
+# Data / local DBs (but commit the prebuilt knowledge base — the deployed app
+# ships it so there's no ingestion step or API key needed at startup)
 data/*.db
+!data/knowledge.db
+!data/recipes.db
 
 # Python
 __pycache__/

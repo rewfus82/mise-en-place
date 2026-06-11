@@ -18,6 +18,10 @@ dependencies = [
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.30.0",
     "python-multipart>=0.0.9",
+    # RAG: local, API-key-free retrieval (dense + sparse, all in SQLite)
+    "sqlite-vec>=0.1.9",
+    "model2vec>=0.3.0",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]

@@ -22,7 +22,10 @@ export function MacroTargets() {
   const initialized = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
-  // Initialize from saved profile (only once per profile load)
+  // Initialize from saved profile (only once per profile load).
+  // Intentional sync of editable form fields from async-loaded data; the React
+  // Compiler's set-state-in-effect rule flags this established pattern.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!profile) return
     initialized.current = false
@@ -48,6 +51,7 @@ export function MacroTargets() {
     }
     // Delay marking initialized so the above state writes don't trigger a save
     setTimeout(() => { initialized.current = true }, 100)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.calorie_target, profile?.protein_target_g, profile?.carbs_target_g, profile?.fat_target_g])
 
   // Auto-recalculate carbs & fat when calories or protein change
@@ -59,6 +63,7 @@ export function MacroTargets() {
     if (!carbsLocked) setCarbs(String(autoCarbs))
     if (!fatLocked)   setFat(String(autoFat))
   }, [calories, protein, carbsLocked, fatLocked])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const update = useMutation({
     mutationFn: (data: Partial<UserProfile>) => profileApi.update(data),
@@ -83,6 +88,7 @@ export function MacroTargets() {
         fat_target_g:     fat      ? Number(fat)       : undefined,
       })
     }, 700)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calories, protein, carbs, fat])
 
   if (!profile) return null

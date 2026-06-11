@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { track } from '../../lib/analytics'
-import { streamSSE } from '../../api/client'
-import type { SSEEvent, SSEReviewEvent } from '../../types'
+import { usePlanning } from '../../context/PlanningContext'
+import { useStalled } from '../../hooks/useStalled'
+import { mealLabel } from '../../lib/mealLabels'
+import type { SSEReviewEvent } from '../../types'
 import { Button } from '../ui/Button'
-import { useQueryClient } from '@tanstack/react-query'
 
 interface PlanSidePanelProps {
   selectedDates: string[]
@@ -11,127 +11,41 @@ interface PlanSidePanelProps {
   profile?: { meals_per_day?: number; calorie_target?: number | null }
 }
 
-type PanelStep = 'config' | 'streaming' | 'review' | 'committing' | 'done'
-
 export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanelProps) {
-  const qc = useQueryClient()
-  const [step, setStep] = useState<PanelStep>('config')
+  const { job, startRangePlan, approve, revise, cancel } = usePlanning()
+
+  // Config is panel-local: it only matters before a job exists.
   const [bulkEnabled, setBulkEnabled] = useState(false)
   const [bulkPct, setBulkPct] = useState(50)
   const [bulkRepeatAll, setBulkRepeatAll] = useState(false)
   const [specialRequests, setSpecialRequests] = useState('')
-  const [progressMessages, setProgressMessages] = useState<string[]>([])
-  const [reviewData, setReviewData] = useState<SSEReviewEvent | null>(null)
-  const [threadId, setThreadId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
+
+  const step = job.status === 'idle' ? 'config' : job.status
+  const reviewData: SSEReviewEvent | null = job.review
+  const error = job.error
+  const stalled = useStalled(job.lastEventAt, step === 'streaming')
 
   // Auto-scroll the activity log whenever a new message arrives
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [progressMessages])
+  }, [job.progress])
 
-  const sortedDates = [...selectedDates].sort()
-  const startDate = sortedDates[0]
-  const numDays = sortedDates.length
+  const sortedSelected = [...selectedDates].sort()
+  const startDate = step === 'config' ? sortedSelected[0] : job.dates[0]
+  const numDays = step === 'config' ? sortedSelected.length : job.dates.length
 
-  const handleGenerate = async () => {
-    setStep('streaming')
-    setProgressMessages([])
-    setError(null)
+  const handleGenerate = () =>
+    startRangePlan(sortedSelected, { bulkEnabled, bulkPct, bulkRepeatAll, specialRequests })
 
-    track('plan_started', { num_days: numDays, bulk_prep: bulkEnabled })
+  const handleApprove = () => approve()
 
-    const tid = `range-${startDate}-${numDays}-${Date.now()}`
-    setThreadId(tid)
-
-    try {
-      for await (const event of streamSSE('/plan/range', {
-        start_date: startDate,
-        num_days: numDays,
-        bulk_prep_enabled: bulkEnabled,
-        bulk_prep_pct: bulkPct / 100,
-        bulk_repeat_all_days: bulkRepeatAll,
-        special_requests: specialRequests,
-        thread_id: tid,
-      })) {
-        const e = event as unknown as SSEEvent
-        if (e.type === 'progress' && e.message) {
-          setProgressMessages(prev => [...prev, `${e.message}`])
-        } else if (e.type === 'error') {
-          setError(e.message ?? 'An error occurred')
-          setStep('config')
-          return
-        } else if (e.type === 'awaiting_review') {
-          track('plan_awaiting_review', { num_days: numDays })
-          setReviewData(e as SSEReviewEvent)
-          setStep('review')
-          return
-        } else if (e.type === 'complete') {
-          setStep('done')
-          qc.invalidateQueries({ queryKey: ['calendar'] })
-          qc.invalidateQueries({ queryKey: ['grocery'] })
-        }
-      }
-    } catch (err) {
-      setError(String(err))
-      setStep('config')
-    }
-  }
-
-  const handleApprove = async () => {
-    if (!threadId) return
-    track('plan_approved', { num_days: numDays })
-    setStep('committing')
-
-    try {
-      for await (const event of streamSSE('/plan/range/resume', {
-        thread_id: threadId,
-        feedback: 'approve',
-      })) {
-        const e = event as unknown as SSEEvent
-        if (e.type === 'complete') {
-          setStep('done')
-          qc.invalidateQueries({ queryKey: ['calendar'] })
-          qc.invalidateQueries({ queryKey: ['grocery'] })
-        }
-      }
-    } catch (err) {
-      setError(String(err))
-      setStep('review')
-    }
-  }
-
-  const handleRevise = async () => {
-    if (!threadId || !feedback.trim()) return
-    track('plan_revised')
-    setStep('streaming')
-    setProgressMessages([`Revising — ${feedback}`])
-    setError(null)
-
-    try {
-      for await (const event of streamSSE('/plan/range/resume', {
-        thread_id: threadId,
-        feedback,
-      })) {
-        const e = event as unknown as SSEEvent
-        if (e.type === 'progress' && e.message) {
-          setProgressMessages(prev => [...prev, e.message])
-        } else if (e.type === 'awaiting_review') {
-          setReviewData(e as SSEReviewEvent)
-          setStep('review')
-          setFeedback('')
-        } else if (e.type === 'complete') {
-          setStep('done')
-          qc.invalidateQueries({ queryKey: ['calendar'] })
-          qc.invalidateQueries({ queryKey: ['grocery'] })
-        }
-      }
-    } catch (err) {
-      setError(String(err))
-      setStep('review')
-    }
+  const handleRevise = () => {
+    if (!feedback.trim()) return
+    const fb = feedback
+    setFeedback('')
+    revise(fb)
   }
 
   // Derived review stats
@@ -160,6 +74,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
         </div>
         <button
           onClick={onClose}
+          title={step === 'streaming' || step === 'committing' ? 'Minimize — keeps running' : 'Close'}
           className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 16 16">
@@ -256,14 +171,14 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
                 <span className="text-[10px] text-slate-600 ml-1 font-mono">activity</span>
               </div>
               <div className="h-48 overflow-y-auto px-3 py-2.5 space-y-1.5 font-mono text-xs">
-                {progressMessages.length === 0 ? (
+                {job.progress.length === 0 ? (
                   <div className="flex items-center gap-2 text-slate-600">
                     <span className="animate-pulse">▋</span>
                     <span>Starting up…</span>
                   </div>
                 ) : (
-                  progressMessages.map((msg, i) => {
-                    const isLatest = i === progressMessages.length - 1
+                  job.progress.map((msg, i) => {
+                    const isLatest = i === job.progress.length - 1
                     return (
                       <div key={i} className={`flex gap-2 ${isLatest ? 'text-slate-300' : 'text-slate-600'}`}>
                         <span className="text-slate-700 shrink-0 select-none">›</span>
@@ -273,7 +188,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
                   })
                 )}
                 {/* Blinking cursor on latest line */}
-                {progressMessages.length > 0 && (
+                {job.progress.length > 0 && (
                   <div className="flex gap-2 text-slate-600">
                     <span className="text-slate-700 select-none">›</span>
                     <span className="animate-pulse">▋</span>
@@ -283,9 +198,23 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
               </div>
             </div>
 
+            {stalled && (
+              <div className="flex items-center gap-2 text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                <span className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                Still working — your AI provider may be rate-limiting; retrying…
+              </div>
+            )}
+
             <p className="text-xs text-slate-600 text-center">
-              This may take 15–30 seconds for multi-day plans
+              This may take 15–30 seconds for multi-day plans — you can switch pages, it keeps running.
             </p>
+
+            <button
+              onClick={cancel}
+              className="w-full text-xs text-slate-500 hover:text-rose-400 py-1.5 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
@@ -311,6 +240,44 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
                 </div>
               </div>
             </div>
+
+            {/* Evidence grounding — shows the plan is backed by sourced literature */}
+            {((reviewData.applied_guidelines && reviewData.applied_guidelines.length > 0) ||
+              reviewData.guideline_summary) && (
+              <div className="bg-slate-800/40 border border-slate-700/60 rounded-lg px-3 py-2.5">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 uppercase tracking-wider font-medium mb-1.5">
+                  <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 16 16">
+                    <path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                    <path d="M5.5 7h5M5.5 9.5h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                  Grounded in
+                </div>
+                {reviewData.guideline_summary && (
+                  <p className="text-xs text-slate-300 leading-relaxed mb-2">
+                    {reviewData.guideline_summary}
+                  </p>
+                )}
+                <ul className="space-y-1">
+                  {reviewData.applied_guidelines?.map((g, i) => (
+                    <li key={i} className="text-xs text-slate-400">
+                      {g.url ? (
+                        <a
+                          href={g.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-300 hover:text-emerald-400 hover:underline"
+                        >
+                          {g.citation}
+                        </a>
+                      ) : (
+                        <span className="text-slate-300">{g.citation}</span>
+                      )}
+                      {g.title && <span className="text-slate-600"> — {g.title}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {error && (
               <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
@@ -347,7 +314,7 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
                       <div key={m.meal_number} className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider shrink-0">
-                            M{m.meal_number}
+                            {mealLabel(m.meal_number, day.meals.length)}
                           </span>
                           <span className="text-sm text-slate-200 truncate">{m.recipe_name}</span>
                           {m.is_bulk_prep && (
@@ -396,6 +363,23 @@ export function PlanSidePanel({ selectedDates, onClose, profile }: PlanSidePanel
           <div className="flex flex-col items-center justify-center h-48 gap-3">
             <span className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
             <span className="text-sm text-slate-400">Saving to calendar…</span>
+          </div>
+        )}
+
+        {/* Error step (outside review) */}
+        {step === 'error' && (
+          <div className="flex flex-col items-center justify-center h-64 gap-4">
+            <div className="w-12 h-12 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center">
+              <svg className="w-6 h-6 text-rose-400" fill="none" viewBox="0 0 24 24">
+                <path d="M12 8v5M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-base font-semibold text-slate-100">Planning failed</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs">{error}</p>
+            </div>
+            <Button variant="secondary" onClick={onClose}>Close</Button>
           </div>
         )}
 

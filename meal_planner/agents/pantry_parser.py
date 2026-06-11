@@ -31,6 +31,23 @@ def make_parser(provider: str, api_key: str):
     return make_llm(provider, api_key, role="light").with_structured_output(_ParsedPantry)
 
 
+def parse_and_add(content, provider: str, api_key: str) -> dict:
+    """Extract pantry items from message `content` and add them to inventory.
+
+    `content` is anything LangChain accepts as HumanMessage content — a plain text
+    string, or a list of content blocks (text + image) for photo input. The same
+    structured schema and add pipeline serve every input modality. Returns
+    {"added": [...], "skipped": [...]}. Raises LLMConfigError for a bad provider/key.
+    """
+    parser = make_parser(provider, api_key)
+    parsed: _ParsedPantry = parser.invoke(
+        [SystemMessage(content=_SYSTEM), HumanMessage(content=content)]
+    )
+    items = [item.model_dump() for item in parsed.items]
+    result = tool_add_items.invoke({"items": items})
+    return {"added": result.get("added", []), "skipped": result.get("skipped", [])}
+
+
 def pantry_parser_node(state: dict, config: RunnableConfig | None = None) -> dict:
     user_input = state["messages"][-1].content
 

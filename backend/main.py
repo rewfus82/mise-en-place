@@ -18,6 +18,7 @@ logging.basicConfig(
 from backend.database import create_tables
 from backend.routers import (
     calendar,
+    coach,
     diagnostics,
     grocery,
     meals,
@@ -58,6 +59,7 @@ app.include_router(calendar.router, prefix="/api/calendar")
 app.include_router(meals.router, prefix="/api/days")
 app.include_router(grocery.router, prefix="/api/grocery")
 app.include_router(planning.router, prefix="/api/plan")
+app.include_router(coach.router, prefix="/api/coach")
 app.include_router(weight_log.router, prefix="/api/weight-log")
 app.include_router(diagnostics.router, prefix="/api")
 

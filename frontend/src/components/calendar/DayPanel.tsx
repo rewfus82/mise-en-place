@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { MealDay, UserProfile } from '../../types'
 import { useCalendarMutations } from '../../hooks/useCalendar'
-import { calendarApi } from '../../api/calendar'
+import { usePlanning } from '../../context/PlanningContext'
 import { weightLogApi } from '../../api/weightLog'
 import { kgToLbs, lbsToKg } from '../../lib/units'
 import { AmbiguousQtyPrompt } from '../confirmation/AmbiguousQtyPrompt'
@@ -46,11 +46,10 @@ export function DayPanel({ date, day, profile, onClose }: DayPanelProps) {
   const weightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
-    if (currentEntry) {
-      setWeightInput(kgToLbs(currentEntry.weight_kg).toFixed(1))
-    } else {
-      setWeightInput('')
-    }
+    // Intentional sync of the editable input from the saved entry.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWeightInput(currentEntry ? kgToLbs(currentEntry.weight_kg).toFixed(1) : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEntry?.weight_kg, date])
 
   const weightMutation = useMutation({
@@ -107,13 +106,12 @@ export function DayPanel({ date, day, profile, onClose }: DayPanelProps) {
     onClose()
   }
 
-  const regenerate = useMutation({
-    mutationFn: () => calendarApi.regenerateDay(date),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['calendar'] })
-      qc.invalidateQueries({ queryKey: ['grocery'] })
-    },
-  })
+  // Single-day regeneration runs through the planning provider so it persists
+  // across navigation and shows in the global pill, like the multi-day plan.
+  const { job: planJob, startDayRegen } = usePlanning()
+  const isRegenThisDay = planJob.kind === 'day' && planJob.dates[0] === date
+  const regenLoading = isRegenThisDay && planJob.status === 'streaming'
+  const regenError = isRegenThisDay && planJob.status === 'error'
 
   return (
     <>
@@ -222,6 +220,7 @@ export function DayPanel({ date, day, profile, onClose }: DayPanelProps) {
                   key={meal.id}
                   meal={meal}
                   date={date}
+                  totalMeals={meals.length}
                   readOnly={day?.status === 'completed' || day?.status === 'skipped'}
                   onToggleEaten={(eaten) => toggleEaten.mutate({ date, mealId: meal.id, eaten })}
                   onToggleSkipped={(skipped) => toggleSkipped.mutate({ date, mealId: meal.id, skipped })}
@@ -252,14 +251,15 @@ export function DayPanel({ date, day, profile, onClose }: DayPanelProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => regenerate.mutate()}
-                loading={regenerate.isPending}
+                onClick={() => startDayRegen(date)}
+                loading={regenLoading}
+                disabled={regenLoading}
                 className="w-full"
               >
-                {regenerate.isPending ? 'Regenerating…' : 'Regenerate this day'}
+                {regenLoading ? 'Regenerating…' : 'Regenerate this day'}
               </Button>
             )}
-            {regenerate.isError && (
+            {regenError && (
               <p className="text-xs text-rose-400 text-center">Regeneration failed — try again.</p>
             )}
             <Button

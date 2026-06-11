@@ -91,6 +91,7 @@ def _build_initial_state(req: PlanRangeRequest, profile: dict, pantry: list) -> 
         "fat_target_g": profile.get("fat_target_g"),
         "meal_style": profile.get("meal_style", "simple"),
         "meals_per_day": profile.get("meals_per_day", 3),
+        "goal": profile.get("goal", "maintain"),
         "start_date": req.start_date,
         "num_days": req.num_days,
         "bulk_prep_enabled": req.bulk_prep_enabled,
@@ -100,6 +101,8 @@ def _build_initial_state(req: PlanRangeRequest, profile: dict, pantry: list) -> 
         "pantry_inventory": pantry,
         "planned_days": [],
         "nutrition_summaries": [],
+        "applied_guidelines": [],
+        "guideline_summary": "",
         "awaiting_human_approval": False,
         "human_feedback": None,
         "current_agent": "orchestrator",
@@ -317,6 +320,8 @@ async def stream_plan(
                 "thread_id": thread_id,
                 "days": planned_days,
                 "nutrition_summaries": nutrition,
+                "applied_guidelines": snapshot.values.get("applied_guidelines", []),
+                "guideline_summary": snapshot.values.get("guideline_summary", ""),
             })
         else:
             planned_days = snapshot.values.get("planned_days", [])
@@ -401,6 +406,8 @@ async def resume_plan(
             "thread_id": req.thread_id,
             "days": planned_days,
             "nutrition_summaries": nutrition,
+            "applied_guidelines": snapshot.values.get("applied_guidelines", []),
+            "guideline_summary": snapshot.values.get("guideline_summary", ""),
         })
     else:
         if approved:

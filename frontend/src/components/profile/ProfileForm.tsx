@@ -63,7 +63,9 @@ export function ProfileForm() {
     },
   })
 
-  // Initialize once when profile loads
+  // Initialize once when profile loads — intentional sync of editable form fields
+  // from async-loaded data (React Compiler's set-state-in-effect rule flags this).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!profile) return
     if (profile.weight_kg)  setWeight(String(Math.round(kgToLbs(profile.weight_kg))))
@@ -84,12 +86,14 @@ export function ProfileForm() {
     if (profile.weekly_budget) setBudget(String(profile.weekly_budget))
     setRestrictions(profile.dietary_restrictions.join(', '))
     setAllergies(profile.food_allergies)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     profile?.weight_kg, profile?.height_cm, profile?.age, profile?.sex,
     profile?.activity_level, profile?.goal, profile?.body_fat_pct,
     profile?.meal_style, profile?.meals_per_day, profile?.skill_level,
     profile?.max_cook_time_minutes, profile?.weekly_budget, profile?.food_allergies,
   ])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const save = useCallback((partial: Partial<UserProfile>, delay = 600) => {
     pendingRef.current = { ...pendingRef.current, ...partial }

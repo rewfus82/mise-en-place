@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import type { DayMeal } from '../../types'
+import { mealLabel } from '../../lib/mealLabels'
 import { Badge } from '../ui/Badge'
 
 interface MealRowProps {
   meal: DayMeal
   date: string
+  totalMeals?: number
   readOnly?: boolean
   onToggleEaten: (eaten: boolean) => void
   onToggleSkipped: (skipped: boolean) => void
   prepServingsRemaining?: number
 }
 
-export function MealRow({ meal, readOnly, onToggleEaten, onToggleSkipped, prepServingsRemaining }: MealRowProps) {
+export function MealRow({ meal, totalMeals, readOnly, onToggleEaten, onToggleSkipped, prepServingsRemaining }: MealRowProps) {
   const [expanded, setExpanded] = useState(false)
 
   const cal = Math.round(meal.calories_est ?? 0)
@@ -59,7 +61,7 @@ export function MealRow({ meal, readOnly, onToggleEaten, onToggleSkipped, prepSe
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider shrink-0">
-              M{meal.meal_number}
+              {mealLabel(meal.meal_number, totalMeals ?? 0)}
             </span>
             <span className={`text-sm font-semibold truncate ${isEaten ? 'text-slate-400 line-through' : 'text-slate-100'}`}>
               {meal.recipe_name}

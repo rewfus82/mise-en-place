@@ -130,11 +130,19 @@ export interface SSEProgressEvent {
   message: string
 }
 
+export interface AppliedGuideline {
+  citation: string
+  title: string | null
+  url: string | null
+}
+
 export interface SSEReviewEvent {
   type: 'awaiting_review'
   thread_id: string
   days: PlanReviewDay[]
   nutrition_summaries: NutritionSummary[]
+  applied_guidelines?: AppliedGuideline[]
+  guideline_summary?: string
 }
 
 export interface SSECompleteEvent {
@@ -151,6 +159,39 @@ export type SSEEvent =
   | SSEProgressEvent
   | SSEReviewEvent
   | SSECompleteEvent
+  | SSEErrorEvent
+
+// --- Nutrition Coach (RAG Q&A) ---
+
+export interface CoachSource {
+  n: number
+  citation: string
+  title: string | null
+  section: string | null
+  journal: string | null
+  url: string | null
+  doi: string | null
+  source_id: string
+}
+
+export interface CoachSourcesEvent {
+  type: 'sources'
+  sources: CoachSource[]
+}
+
+export interface CoachTokenEvent {
+  type: 'token'
+  text: string
+}
+
+export interface CoachDoneEvent {
+  type: 'done'
+}
+
+export type CoachSSEEvent =
+  | CoachSourcesEvent
+  | CoachTokenEvent
+  | CoachDoneEvent
   | SSEErrorEvent
 
 export interface WeightEntry {

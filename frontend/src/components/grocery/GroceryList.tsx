@@ -4,8 +4,11 @@ import { Button } from '../ui/Button'
 import type { GroceryItem } from '../../types'
 
 function DateLabel({ date }: { date: string }) {
-  const today = new Date().toISOString().split('T')[0]
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  // Reading the current date for a relative label is intentionally time-dependent.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
+  const today = new Date(now).toISOString().split('T')[0]
+  const tomorrow = new Date(now + 86400000).toISOString().split('T')[0]
   if (date === today) return <span className="text-rose-400 font-semibold">Today</span>
   if (date === tomorrow) return <span className="text-amber-400 font-semibold">Tomorrow</span>
   return <span>{new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>

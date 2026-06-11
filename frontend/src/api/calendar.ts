@@ -14,10 +14,11 @@ export const calendarApi = {
   skipDay: (date: string) =>
     apiFetch<{ skipped: string }>(`/calendar/${date}/skip`, { method: 'POST' }),
 
-  regenerateDay: (date: string, special_requests = '') =>
+  regenerateDay: (date: string, special_requests = '', signal?: AbortSignal) =>
     apiFetch<{ date: string; meal_count: number }>('/plan/day', {
       method: 'POST',
       body: JSON.stringify({ date, special_requests }),
+      signal,
     }),
 
   toggleEaten: (date: string, mealId: number, eaten: boolean) =>

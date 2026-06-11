@@ -17,6 +17,7 @@ class RangePlanState(TypedDict):
     fat_target_g: int | None
     meal_style: str          # "bland" | "simple" | "recipes" | "macros_only"
     meals_per_day: int
+    goal: str                # "cut" | "bulk" | "maintain" — steers evidence grounding
 
     # Planning scope
     start_date: str          # ISO date of first day being planned
@@ -34,6 +35,8 @@ class RangePlanState(TypedDict):
     # Output
     planned_days: list[dict]        # [{date, meals: [{meal_number, ...}]}]
     nutrition_summaries: list[dict] # per-day nutrition totals
+    applied_guidelines: list[dict]  # evidence sources the plan was grounded in
+    guideline_summary: str          # grounded "why this plan" rationale
 
     # Human-in-the-loop
     awaiting_human_approval: bool

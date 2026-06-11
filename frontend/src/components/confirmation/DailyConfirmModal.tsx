@@ -30,7 +30,8 @@ export function DailyConfirmModal({ days, onDone }: DailyConfirmModalProps) {
   const toggleMeal = (mealId: number) =>
     setEatenIds(prev => {
       const next = new Set(prev)
-      next.has(mealId) ? next.delete(mealId) : next.add(mealId)
+      if (next.has(mealId)) next.delete(mealId)
+      else next.add(mealId)
       return next
     })
 

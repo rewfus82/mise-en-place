@@ -17,6 +17,11 @@ class ParsePantryRequest(BaseModel):
     text: str
 
 
+class ParseImageRequest(BaseModel):
+    data: str                      # base64-encoded image bytes (no data: URI prefix)
+    mime_type: str = "image/jpeg"
+
+
 class ParsePantryResponse(BaseModel):
     added: list[str]
     skipped: list[str]

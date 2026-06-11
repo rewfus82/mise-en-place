@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { MealDay, UserProfile } from '../../types'
+import { usePlanning } from '../../context/PlanningContext'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { DayCell } from './DayCell'
 import { DayPanel } from './DayPanel'
 import { PlanSidePanel } from './PlanSidePanel'
@@ -48,7 +50,7 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<string | null>(null)
   const [openDay, setOpenDay] = useState<string | null>(null)
-  const [showPlanPanel, setShowPlanPanel] = useState(false)
+  const { job, panelOpen, openPanel, closePanel, reset } = usePlanning()
 
   const dayMap = new Map(days.map(d => [d.date, d]))
   const today = new Date().toISOString().split('T')[0]
@@ -74,7 +76,8 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
     setDragStart(date)
     setSelectedDates(prev => {
       const next = new Set(prev)
-      next.has(date) ? next.delete(date) : next.add(date)
+      if (next.has(date)) next.delete(date)
+      else next.add(date)
       return next
     })
   }, [])
@@ -87,6 +90,7 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
     if (startIdx === -1 || endIdx === -1) return
     const [lo, hi] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
     setSelectedDates(new Set(selectableCells.slice(lo, hi + 1).map(c => c.date)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging, dragStart, allCells, today])
 
   const handlePointerUp = useCallback(() => {
@@ -100,12 +104,29 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
     // Open panel for any past/today date (for history + weight log) or any planned date
     if (hasMeals || isViewable(date)) {
       setOpenDay(date)
-      setShowPlanPanel(false)
+      closePanel()  // minimize any active plan to the pill; keeps it running
     }
-  }, [selectedDates.size, dayMap, today])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDates.size, dayMap, today, closePanel])
+
+  const handlePlanClose = useCallback(() => {
+    // Done/error/config → clear the job; mid-run → just minimize to the pill.
+    if (job.status === 'streaming' || job.status === 'review' || job.status === 'committing') {
+      closePanel()
+    } else {
+      reset()
+      setSelectedDates(new Set())
+    }
+  }, [job.status, closePanel, reset])
 
   const openDayData = openDay ? dayMap.get(openDay) : undefined
+  const showPlanPanel = panelOpen && openDay === null
   const hasSidePanel = openDay !== null || showPlanPanel
+
+  useEscapeKey(
+    () => { if (openDay) setOpenDay(null); else if (showPlanPanel) handlePlanClose() },
+    hasSidePanel,
+  )
 
   return (
     <div
@@ -192,7 +213,10 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
                     day={dayMap.get(date)}
                     isCurrentMonth={inMonth}
                     selected={selectedDates.has(date)}
+                    isOpen={openDay === date}
                     weightKg={weightByDate?.get(date)}
+                    calorieTarget={profile?.calorie_target}
+                    proteinTarget={profile?.protein_target_g}
                     onPointerDown={handlePointerDown}
                     onPointerEnter={handlePointerEnter}
                     onClick={handleCellClick}
@@ -201,6 +225,16 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 pb-3 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Today</span>
+          <span className="flex items-center gap-1.5"><span className="w-1 h-3 rounded-sm bg-emerald-500" />Completed</span>
+          <span className="flex items-center gap-1.5"><span className="w-1 h-3 rounded-sm bg-amber-400" />Missed</span>
+          <span className="text-slate-700">·</span>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />On target</span>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Off target</span>
         </div>
       </div>
 
@@ -222,7 +256,7 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
           <PlanSidePanel
             selectedDates={Array.from(selectedDates).sort()}
             profile={profile}
-            onClose={() => { setShowPlanPanel(false); setSelectedDates(new Set()) }}
+            onClose={handlePlanClose}
           />
         </div>
       )}
@@ -230,7 +264,7 @@ export function CalendarView({ year, month, days, profile, weightByDate, onMonth
       {/* Selection toolbar */}
       <SelectionToolbar
         selectedCount={selectedDates.size}
-        onPlan={() => { setOpenDay(null); setShowPlanPanel(true) }}
+        onPlan={() => { setOpenDay(null); openPanel() }}
         onClear={() => setSelectedDates(new Set())}
       />
     </div>

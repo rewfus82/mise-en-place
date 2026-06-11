@@ -35,6 +35,16 @@ const links = [
     ),
   },
   {
+    to: '/coach',
+    label: 'Coach',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 20 20">
+        <path d="M4 4h12v9H8l-3 3v-3H4V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M7.5 8h5M7.5 10.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     to: '/profile',
     label: 'Profile',
     icon: (

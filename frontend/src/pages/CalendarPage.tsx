@@ -25,8 +25,22 @@ export function CalendarPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-        Loading calendar...
+      <div className="h-screen flex flex-col px-6 py-4">
+        <div className="h-7 w-44 bg-slate-800 rounded animate-pulse mb-5" />
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="h-3 w-10 mx-auto bg-slate-800/70 rounded animate-pulse" />
+          ))}
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, w) => (
+            <div key={w} className="grid grid-cols-7 gap-2">
+              {Array.from({ length: 7 }).map((_, d) => (
+                <div key={d} className="min-h-[92px] rounded-xl bg-slate-900 border border-slate-800/60 animate-pulse" />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     )
   }

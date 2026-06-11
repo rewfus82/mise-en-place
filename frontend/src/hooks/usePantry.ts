@@ -16,7 +16,12 @@ export function usePantryMutations() {
   const remove = useMutation({ mutationFn: pantryApi.remove, onSuccess: invalidate })
   const clear = useMutation({ mutationFn: pantryApi.clear, onSuccess: invalidate })
   const parse = useMutation({ mutationFn: pantryApi.parse, onSuccess: invalidate })
+  const parseImage = useMutation({
+    mutationFn: ({ data, mimeType }: { data: string; mimeType: string }) =>
+      pantryApi.parseImage(data, mimeType),
+    onSuccess: invalidate,
+  })
   const deplete = useMutation({ mutationFn: pantryApi.deplete, onSuccess: invalidate })
 
-  return { add, remove, clear, parse, deplete }
+  return { add, remove, clear, parse, parseImage, deplete }
 }

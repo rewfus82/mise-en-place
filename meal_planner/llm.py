@@ -92,3 +92,23 @@ def make_llm(provider: str, api_key: str, role: str = "planner"):
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(model=model, api_key=api_key, timeout=120, max_retries=2)
+
+
+def coerce_text(content) -> str:
+    """Flatten a chat message/chunk's content to plain text.
+
+    Anthropic returns content as a list of typed blocks; OpenAI returns a plain
+    string. Both the Coach token stream and the plan rationale need uniform text,
+    so this single helper handles both shapes.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+        return "".join(parts)
+    return ""

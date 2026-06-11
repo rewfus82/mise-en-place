@@ -17,7 +17,8 @@ export function AmbiguousQtyPrompt({ items, onClose }: AmbiguousQtyPromptProps) 
   const toggle = (item: string) =>
     setChecked(prev => {
       const next = new Set(prev)
-      next.has(item) ? next.delete(item) : next.add(item)
+      if (next.has(item)) next.delete(item)
+      else next.add(item)
       return next
     })
 
