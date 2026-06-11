@@ -7,8 +7,13 @@ frontend/dist
 *.egg-info
 .pytest_cache
 
-# Local data & secrets — must never ship in the image
-data/
+# Local data & secrets — must never ship in the image. Exclude data/ CONTENTS
+# (local calendar/pantry/checkpoint DBs, kb_sources) but keep the committed
+# retrieval corpora the app reads at runtime. NB: data/* not data/ — Docker can't
+# re-include a file whose parent dir is excluded as a whole.
+data/*
+!data/knowledge.db
+!data/recipes.db
 .env
 .env.*
 .streamlit
