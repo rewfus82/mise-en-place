@@ -25,8 +25,15 @@ RUN pip install .
 COPY backend/ ./backend/
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 
-# SQLite lives here (ephemeral on free hosts — fine for a demo sandbox)
-RUN mkdir -p /app/data
+# Prebuilt retrieval corpora (committed): the Coach, plan grounding, and recipe
+# anchors all read these. Runtime DBs (calendar/pantry/checkpoints) are created in
+# this same dir at startup — it's ephemeral on free hosts, fine for a demo.
+COPY data/knowledge.db data/recipes.db ./data/
+
+# Bake the local embedding model into the image so retrieval needs no network or
+# download at runtime — keeps cold starts fast and reliable on the free tier.
+RUN python -c "from model2vec import StaticModel; StaticModel.from_pretrained('minishlab/potion-base-8M').save_pretrained('/app/data/embed-model')"
+ENV RAG_EMBED_MODEL_PATH=/app/data/embed-model
 
 EXPOSE 8000
 # Hosts inject $PORT; default to 8000 locally.
