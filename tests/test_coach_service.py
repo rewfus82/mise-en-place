@@ -99,6 +99,16 @@ async def test_unknown_provider_yields_error():
     assert events[0]["type"] == "error"
 
 
+async def test_retrieval_failure_yields_error(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("knowledge base unavailable")
+
+    monkeypatch.setattr(coach_service, "retrieve", boom)
+    events = await _drain(coach_service.ask_stream("protein?", "anthropic", "sk-ant-x"))
+    assert events == [{"type": "error", "message": events[0]["message"]}]
+    assert "unavailable" in events[0]["message"]
+
+
 async def test_empty_question_yields_error():
     events = await _drain(coach_service.ask_stream("   ", "anthropic", "sk-ant-x"))
     assert events[0]["type"] == "error"

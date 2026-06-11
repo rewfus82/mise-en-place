@@ -87,7 +87,12 @@ async def ask_stream(question: str, provider: str, api_key: str):
         yield _sse({"type": "error", "message": "Ask a nutrition question to get started."})
         return
 
-    chunks = retrieve(question, k=_TOP_K)
+    try:
+        chunks = retrieve(question, k=_TOP_K)
+    except Exception:  # noqa: BLE001 — never leave the stream hanging on a retrieval fault
+        logger.exception("Coach retrieval failed")
+        yield _sse({"type": "error", "message": "The nutrition library is unavailable right now — please try again."})
+        return
     if not chunks:
         yield _sse({"type": "sources", "sources": []})
         yield _sse(
